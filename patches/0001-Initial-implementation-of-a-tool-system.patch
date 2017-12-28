@@ -1,0 +1,202 @@
+From f35b97cad3c7bc4de2221dcac4c50987fd74e187 Mon Sep 17 00:00:00 2001
+From: Bernhard Ehlers <be@bernhard-ehlers.de>
+Date: Thu, 28 Dec 2017 15:17:11 +0100
+Subject: [PATCH] Initial implementation of a tool system
+
+---
+ gns3/graphics_view.py | 20 +++++++++++
+ gns3/main_window.py   | 21 ++++++++++++
+ gns3/tool.py          | 93 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 134 insertions(+)
+ create mode 100644 gns3/tool.py
+
+diff --git a/gns3/graphics_view.py b/gns3/graphics_view.py
+index 774a2a5..ad6f2b8 100644
+--- a/gns3/graphics_view.py
++++ b/gns3/graphics_view.py
+@@ -753,6 +753,17 @@ class GraphicsView(QtWidgets.QGraphicsView):
+             aux_console_action.triggered.connect(self.auxConsoleActionSlot)
+             menu.addAction(aux_console_action)
+ 
++        tool_list = self._main_window.tools.contextTools(items)
++        if tool_list:
++            tool_menu_action = QtWidgets.QMenu("Tools", menu)
++            tool_menu_action.setIcon(QtGui.QIcon(':/icons/applications.svg'))
++            menu.addAction(tool_menu_action.menuAction())
++            for tool in tool_list:
++                tool_action = QtWidgets.QAction(tool.name(), tool_menu_action)
++                tool_action.setData(tool)
++                tool_action.triggered.connect(self.startToolSlot)
++                tool_menu_action.addAction(tool_action)
++
+         if sys.platform.startswith("win") and True in list(map(lambda item: isinstance(item, NodeItem) and hasattr(item.node(), "bringToFront"), items)):
+             # Action: bring console or window to front (Windows only)
+             bring_to_front_action = QtWidgets.QAction("Bring to front", menu)
+@@ -1571,3 +1582,12 @@ class GraphicsView(QtWidgets.QGraphicsView):
+             self._main_window.uiDeviceMenu.setEnabled(True)
+         else:
+             self._main_window.uiDeviceMenu.setEnabled(False)
++
++    def startToolSlot(self):
++        """
++        Slot called to start tool from the contextual menu.
++        """
++
++        action = self.sender()
++        if action and action.data():
++            action.data().run(self._topology.project(), self.scene().selectedItems())
+diff --git a/gns3/main_window.py b/gns3/main_window.py
+index 3185087..de31286 100644
+--- a/gns3/main_window.py
++++ b/gns3/main_window.py
+@@ -55,6 +55,7 @@ from .dialogs.notif_dialog import NotifDialog, NotifDialogHandler
+ from .status_bar import StatusBarHandler
+ from .registry.appliance import ApplianceError
+ from .appliance_manager import ApplianceManager
++from .tool import ToolList
+ 
+ log = logging.getLogger(__name__)
+ 
+@@ -107,6 +108,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+         self._project_dialog = None
+         self.recent_file_actions = []
+         self.recent_project_actions = []
++        self.tools = ToolList()
+         self._start_time = time.time()
+         local_config = LocalConfig.instance()
+         local_config.config_changed_signal.connect(self._localConfigChangedSlot)
+@@ -160,6 +162,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+         self.recent_project_actions_separator.setVisible(False)
+         self.uiFileMenu.addActions(self.recent_project_actions)
+ 
++        # add tools to tools menu
++        tool_list = self.tools.menuTools()
++        if tool_list:
++            self.uiToolsMenu.addSeparator()
++            for tool in tool_list:
++                action = QtWidgets.QAction(tool.name(), self.uiToolsMenu)
++                action.setData(tool)
++                action.triggered.connect(self.startToolSlot)
++                self.uiToolsMenu.addAction(action)
++
+         # set the window icon
+         self.setWindowIcon(QtGui.QIcon(":/images/gns3.ico"))
+ 
+@@ -446,6 +458,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+                 (project_id, ) = action.data()
+                 Topology.instance().createLoadProject({"project_id": project_id})
+ 
++    def startToolSlot(self):
++        """
++        Slot called to start tool from the tools menu.
++        """
++
++        action = self.sender()
++        if action and action.data():
++            action.data().run(Topology.instance().project(), self.uiGraphicsView.scene().selectedItems())
++
+     def loadPath(self, path):
+         """Open a file and close the previous project"""
+ 
+diff --git a/gns3/tool.py b/gns3/tool.py
+new file mode 100644
+index 0000000..088867c
+--- /dev/null
++++ b/gns3/tool.py
+@@ -0,0 +1,93 @@
++# -*- coding: utf-8 -*-
++#
++# Copyright (C) 2017 Bernhard Ehlers
++#
++# This program is free software: you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation, either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++"""
++Manage Tools
++"""
++
++import os
++import logging
++import subprocess
++
++from .version import __version__
++from .items.node_item import NodeItem
++from .items.link_item import LinkItem
++from .items.text_item import TextItem
++from .items.drawing_item import DrawingItem
++
++log = logging.getLogger(__name__)
++
++
++class Tool:
++    """ tool class """
++
++    def __init__(self, name, path):
++        self._name = name
++        self._path = path
++
++    def name(self):
++        """ tool name """
++        return self._name
++
++    def run(self, project, item_list):
++        """ run tool """
++
++        if not project:
++            return
++        args = [self._path, __version__, project.id()]
++        for item in item_list:
++            if isinstance(item, NodeItem):
++                args.append("nodes/" + item.node().node_id())
++            elif isinstance(item, LinkItem):
++                args.append("links/" + item.link().link_id())
++            elif isinstance(item, TextItem):
++                args.append("text_drawings/" + item.drawing_id())
++            elif isinstance(item, DrawingItem):
++                args.append("drawings/" + item.drawing_id())
++
++        try:
++            subprocess.Popen(args, env=os.environ)
++        except (OSError, ValueError, subprocess.SubprocessError) as err:
++            log.error('could not start tool %s: %s', self._name, err)
++
++
++class ToolList:
++    """ tool list """
++
++    def __init__(self):
++        tool_path = os.path.join(os.path.expanduser('~'), 'GNS3', 'tools')
++        tools = []
++        try:
++            for entry in os.listdir(tool_path):
++                path = os.path.join(tool_path, entry)
++                if not path.lower().endswith(".json") and \
++                   os.path.isfile(path) and os.access(path, os.X_OK):
++                    name = os.path.splitext(entry)[0]
++                    tools.append(Tool(name, path))
++        except OSError:
++            pass
++        tools.sort(key=lambda k: k.name().lower())
++        self._tools = tools
++
++    def contextTools(self, items):
++        """ return context tool list """
++        if True in list(map(lambda item: isinstance(item, (DrawingItem, NodeItem)), items)):
++            return self._tools
++        return []
++
++    def menuTools(self):
++        """ return menu tool list """
++        return self._tools
+-- 
+2.10.1 (Apple Git-78)
+
