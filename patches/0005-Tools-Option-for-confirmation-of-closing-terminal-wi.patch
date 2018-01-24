@@ -1,0 +1,174 @@
+From 88e52ddd2c4bde97c86e3345d7e379195ce3dcce Mon Sep 17 00:00:00 2001
+From: Bernhard Ehlers <be@bernhard-ehlers.de>
+Date: Wed, 24 Jan 2018 10:29:47 +0100
+Subject: [PATCH 5/5] Tools - Option for confirmation of closing terminal window
+
+---
+ gns3/tool.py | 78 +++++++++++++++++++++++++++++++++++++++---------------------
+ tools.md     | 15 +++++++-----
+ 2 files changed, 60 insertions(+), 33 deletions(-)
+
+diff --git a/gns3/tool.py b/gns3/tool.py
+index fca4e8c..f567213 100644
+--- a/gns3/tool.py
++++ b/gns3/tool.py
+@@ -37,15 +37,18 @@ log = logging.getLogger(__name__)
+ 
+ # sh_quote inspired by compat_shlex_quote in youtube-dl:youtube_dl/compat.py
+ if sys.platform.startswith("win"):
+-    def sh_quote(arg):
+-        """ quote argument for safe use in windows CMD """
++    def arg_quote(arg):
++        """ quote argument for safe use in windows """
+         if not re.match(r'^[-._\w]+$', arg):
+             arg = '"' + arg.replace('"', '\\"') + '"'
+-        arg = re.sub(r'([()%!^"<>&|])', r'^\1', arg)
+         return arg
++
++    def cmd_quote(arg):
++        """ quote argument for safe use in CMD """
++        return re.sub(r'([()%!^"<>&|])', r'^\1', arg)
+ else:
+-    def sh_quote(arg):
+-        """ quote argument for safe use in sh """
++    def arg_quote(arg):
++        """ quote argument for safe use in unix """
+         if not re.match(r'^[-_\w./]+$', arg):
+             arg = "'" + arg.replace("'", "'\"'\"'") + "'"
+         return arg
+@@ -58,6 +61,13 @@ class ContextState(Enum):
+     node = 2
+ 
+ 
++class ConfirmCloseState(Enum):
++    """ enum for confirm_close option """
++    disable = 0
++    enable = 1
++    on_error = 2
++
++
+ class Tool:
+     """ tool class """
+ 
+@@ -66,20 +76,26 @@ class Tool:
+     def __init__(self, name, path, options):
+         self._name = name
+         self._path = path
+-        self.menu = options.get('menu', True)
+-        context = options.get('context', ContextState.enable)
++        self.confirm_close = self._enum_opt(options, 'confirm_close',
++                                            ConfirmCloseState,
++                                            ConfirmCloseState.enable)
++        self.context = self._enum_opt(options, 'context',
++                                      ContextState, ContextState.enable)
++        self.menu = bool(options.get('menu', True))
++        self.terminal = bool(options.get('terminal', False))
++
++    def _enum_opt(self, options, opt_name, enum_class, default):
++        """ get enum option """
++        value = options.get(opt_name, default)
+         try:
+-            if isinstance(context, ContextState):
+-                pass
+-            elif isinstance(context, int):
+-                context = ContextState(context)
+-            else:
+-                context = ContextState[context]
++            return enum_class(value)
+         except (KeyError, TypeError, ValueError):
+-            log.warning("Tool %s: unknown context option '%s'", name, context)
+-            context = ContextState.enable
+-        self.context = context
+-        self.terminal = options.get('terminal', False)
++            try:
++                return enum_class[value]
++            except (KeyError, TypeError, ValueError):
++                log.warning("Tool %s: unknown %s option '%s'",
++                            self.name(), opt_name, value)
++                return default
+ 
+     def name(self):
+         """ tool name """
+@@ -88,11 +104,15 @@ class Tool:
+     def run_in_terminal(self, argv):
+         """ run command in terminal window """
+ 
++        cmd = " ".join(arg_quote(arg) for arg in argv)
+         if sys.platform.startswith("win"):
+             cmd_exe = os.environ.get('ComSpec', "cmd.exe")
+-            cmd_string = " ".join(sh_quote(arg) for arg in argv)
+-            subprocess.Popen("{} /c {} & pause".format(cmd_exe, cmd_string),
+-                             env=os.environ)
++            cmd = cmd_quote(cmd)
++            if self.confirm_close == ConfirmCloseState.enable:
++                cmd += " & pause"
++            elif self.confirm_close == ConfirmCloseState.on_error:
++                cmd += " || pause"
++            subprocess.Popen(cmd_exe + " /c " + cmd, env=os.environ)
+         elif sys.platform.startswith("darwin"):
+             osascript = r"""
+ on run (args)
+@@ -115,10 +135,12 @@ on run (args)
+ 	return
+ end run
+ """
+-            cmd = "PATH=" + sh_quote(os.environ['PATH']) + "; " + \
+-                  "cd " + sh_quote(os.getcwd()) + "; " + \
+-                  " ".join(sh_quote(arg) for arg in argv) + \
+-                  "; echo; read -p Close... var"
++            cmd = "PATH=" + arg_quote(os.environ['PATH']) + "; " + \
++                  "cd " + arg_quote(os.getcwd()) + "; " + cmd
++            if self.confirm_close == ConfirmCloseState.enable:
++                cmd += "; read -p '\nClose...' var"
++            elif self.confirm_close == ConfirmCloseState.on_error:
++                cmd += " || read -p '\nClose...' var"
+             prog = os.path.splitext(os.path.basename(argv[0]))[0]
+             subprocess.Popen(["osascript", "-e", osascript, "--", prog, cmd],
+                              env=os.environ)
+@@ -132,9 +154,11 @@ end run
+                 else:
+                     log.error("Tool %s: No terminal emulator found", self._name)
+                     return
+-            cmd = " ".join(sh_quote(arg) for arg in argv) + \
+-                  "; echo; read -p Close... var"
+-            cmd = "sh -c " + sh_quote(cmd)
++            if self.confirm_close == ConfirmCloseState.enable:
++                cmd += "; read -p '\nClose...' var"
++            elif self.confirm_close == ConfirmCloseState.on_error:
++                cmd += " || read -p '\nClose...' var"
++            cmd = "sh -c " + arg_quote(cmd)
+             subprocess.Popen([Tool._terminal_app, "-e", cmd],
+                              env=os.environ)
+ 
+diff --git a/tools.md b/tools.md
+index dd1f2ce..f60652a 100644
+--- a/tools.md
++++ b/tools.md
+@@ -24,15 +24,18 @@ same base name as the tool, but with the .json extension.
+ 
+ It can set the following options:
+ 
+-| Option   | Meaning              | Allowed Values                | Default   |
+-|----------|----------------------|-------------------------------|-----------|
+-| name     | name of tool         | any string                    | base name |
+-| menu     | show in main menu    | false / true                  | true      |
+-| context  | show in context menu | "disable" / "enable" / "node" | "enable"  |
+-| terminal | run in terminal      | false / true                  | false     |
++| Option        | Meaning                  | Allowed Values                    | Default   |
++|---------------|--------------------------|-----------------------------------|-----------|
++| name          | name of tool             | any string                        | base name |
++| menu          | show in main menu        | false / true                      | true      |
++| context       | show in context menu     | "disable" / "enable" / "node"     | "enable"  |
++| terminal      | run in terminal window   | false / true                      | false     |
++| confirm_close | confirm closing terminal | "disable" / "enable" / "on_error" | "enable"  |
+ 
+ With the context option "node" a tool is only shown in
+ the context menu, when at least one node is selected.
++Instead of "disable" or "enable" the boolean values
++false / true can be used.
+ 
+ Example of a .json file:
+ 
+-- 
+2.10.1 (Apple Git-78)
+

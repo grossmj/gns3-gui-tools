@@ -24,15 +24,18 @@ same base name as the tool, but with the .json extension.
 
 It can set the following options:
 
-| Option   | Meaning              | Allowed Values                | Default   |
-|----------|----------------------|-------------------------------|-----------|
-| name     | name of tool         | any string                    | base name |
-| menu     | show in main menu    | false / true                  | true      |
-| context  | show in context menu | "disable" / "enable" / "node" | "enable"  |
-| terminal | run in terminal      | false / true                  | false     |
+| Option        | Meaning                  | Allowed Values                    | Default   |
+|---------------|--------------------------|-----------------------------------|-----------|
+| name          | name of tool             | any string                        | base name |
+| menu          | show in main menu        | false / true                      | true      |
+| context       | show in context menu     | "disable" / "enable" / "node"     | "enable"  |
+| terminal      | run in terminal window   | false / true                      | false     |
+| confirm_close | confirm closing terminal | "disable" / "enable" / "on_error" | "enable"  |
 
 With the context option "node" a tool is only shown in
 the context menu, when at least one node is selected.
+Instead of "disable" or "enable" the boolean values
+false / true can be used.
 
 Example of a .json file:
 
