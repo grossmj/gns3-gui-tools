@@ -1,0 +1,30 @@
+From 5c89166dbba60d6c2990ed011c56fc24f910fa9f Mon Sep 17 00:00:00 2001
+From: Bernhard Ehlers <be@bernhard-ehlers.de>
+Date: Fri, 16 Feb 2018 13:36:53 +0100
+Subject: [PATCH 6/6] Tools - Modify creation of terminal window for OS X
+
+---
+ gns3/tool.py | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/gns3/tool.py b/gns3/tool.py
+index f567213..9044161 100644
+--- a/gns3/tool.py
++++ b/gns3/tool.py
+@@ -125,10 +125,9 @@ on run (args)
+ 	else
+ 		tell application "Terminal"
+ 			activate
+-			repeat while not exists (window 1)
+-				delay 0.2
+-				activate
+-			end repeat
++			if not exists (window 1)
++				tell application "System Events" to keystroke "n" using command down
++			end if
+ 			do script cmd in window 1
+ 		end tell
+ 	end if
+-- 
+2.10.1 (Apple Git-78)
+

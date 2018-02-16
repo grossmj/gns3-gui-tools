@@ -1,7 +1,7 @@
 From c01128dbf60e7c88df46de54aef0873435d7ffe6 Mon Sep 17 00:00:00 2001
 From: Bernhard Ehlers <be@bernhard-ehlers.de>
 Date: Thu, 28 Dec 2017 17:18:39 +0100
-Subject: [PATCH 2/5] Add tool options from JSON file
+Subject: [PATCH 2/6] Add tool options from JSON file
 
 ---
  gns3/tool.py | 53 ++++++++++++++++++++++++++++++++++++++++++++++-------
