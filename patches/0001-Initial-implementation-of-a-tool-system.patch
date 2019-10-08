@@ -1,4 +1,4 @@
-From f35b97cad3c7bc4de2221dcac4c50987fd74e187 Mon Sep 17 00:00:00 2001
+From d63b9271453f4f5a6d22bec9cc422ddbcbf6828e Mon Sep 17 00:00:00 2001
 From: Bernhard Ehlers <be@bernhard-ehlers.de>
 Date: Thu, 28 Dec 2017 15:17:11 +0100
 Subject: [PATCH 1/6] Initial implementation of a tool system
@@ -11,12 +11,12 @@ Subject: [PATCH 1/6] Initial implementation of a tool system
  create mode 100644 gns3/tool.py
 
 diff --git a/gns3/graphics_view.py b/gns3/graphics_view.py
-index 774a2a5..ad6f2b8 100644
+index d965a177..9d589949 100644
 --- a/gns3/graphics_view.py
 +++ b/gns3/graphics_view.py
-@@ -753,6 +753,17 @@ class GraphicsView(QtWidgets.QGraphicsView):
-             aux_console_action.triggered.connect(self.auxConsoleActionSlot)
-             menu.addAction(aux_console_action)
+@@ -819,6 +819,17 @@ class GraphicsView(QtWidgets.QGraphicsView):
+             show_in_file_manager_action.triggered.connect(self.showInFileManagerSlot)
+             menu.addAction(show_in_file_manager_action)
  
 +        tool_list = self._main_window.tools.contextTools(items)
 +        if tool_list:
@@ -32,7 +32,7 @@ index 774a2a5..ad6f2b8 100644
          if sys.platform.startswith("win") and True in list(map(lambda item: isinstance(item, NodeItem) and hasattr(item.node(), "bringToFront"), items)):
              # Action: bring console or window to front (Windows only)
              bring_to_front_action = QtWidgets.QAction("Bring to front", menu)
-@@ -1571,3 +1582,12 @@ class GraphicsView(QtWidgets.QGraphicsView):
+@@ -1625,3 +1636,12 @@ class GraphicsView(QtWidgets.QGraphicsView):
              self._main_window.uiDeviceMenu.setEnabled(True)
          else:
              self._main_window.uiDeviceMenu.setEnabled(False)
@@ -46,26 +46,26 @@ index 774a2a5..ad6f2b8 100644
 +        if action and action.data():
 +            action.data().run(self._topology.project(), self.scene().selectedItems())
 diff --git a/gns3/main_window.py b/gns3/main_window.py
-index 3185087..de31286 100644
+index 0f87bcc2..46cecf59 100644
 --- a/gns3/main_window.py
 +++ b/gns3/main_window.py
-@@ -55,6 +55,7 @@ from .dialogs.notif_dialog import NotifDialog, NotifDialogHandler
- from .status_bar import StatusBarHandler
+@@ -57,6 +57,7 @@ from .status_bar import StatusBarHandler
  from .registry.appliance import ApplianceError
+ from .template_manager import TemplateManager
  from .appliance_manager import ApplianceManager
 +from .tool import ToolList
  
  log = logging.getLogger(__name__)
  
-@@ -107,6 +108,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+@@ -109,6 +110,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
          self._project_dialog = None
          self.recent_file_actions = []
          self.recent_project_actions = []
 +        self.tools = ToolList()
          self._start_time = time.time()
          local_config = LocalConfig.instance()
-         local_config.config_changed_signal.connect(self._localConfigChangedSlot)
-@@ -160,6 +162,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+         #local_config.config_changed_signal.connect(self._localConfigChangedSlot)
+@@ -166,6 +168,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
          self.recent_project_actions_separator.setVisible(False)
          self.uiFileMenu.addActions(self.recent_project_actions)
  
@@ -82,7 +82,7 @@ index 3185087..de31286 100644
          # set the window icon
          self.setWindowIcon(QtGui.QIcon(":/images/gns3.ico"))
  
-@@ -446,6 +458,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+@@ -472,6 +484,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                  (project_id, ) = action.data()
                  Topology.instance().createLoadProject({"project_id": project_id})
  
@@ -100,7 +100,7 @@ index 3185087..de31286 100644
  
 diff --git a/gns3/tool.py b/gns3/tool.py
 new file mode 100644
-index 0000000..088867c
+index 00000000..088867c2
 --- /dev/null
 +++ b/gns3/tool.py
 @@ -0,0 +1,93 @@
@@ -198,5 +198,5 @@ index 0000000..088867c
 +        """ return menu tool list """
 +        return self._tools
 -- 
-2.10.1 (Apple Git-78)
+2.15.1 (Apple Git-101)
 
