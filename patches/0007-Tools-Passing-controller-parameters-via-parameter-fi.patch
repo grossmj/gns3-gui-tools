@@ -1,0 +1,114 @@
+From ec41c624782342df1607675689a42183ff0dd3c2 Mon Sep 17 00:00:00 2001
+From: Bernhard Ehlers <be@bernhard-ehlers.de>
+Date: Tue, 19 Nov 2019 14:18:55 +0100
+Subject: [PATCH 7/7] Tools - Passing controller parameters via parameter file
+
+---
+ gns3/tool.py | 40 ++++++++++++++++++++++++++++++++++++++--
+ tools.md     | 10 ++++++++--
+ 2 files changed, 46 insertions(+), 4 deletions(-)
+
+diff --git a/gns3/tool.py b/gns3/tool.py
+index 90441612..55dcd562 100644
+--- a/gns3/tool.py
++++ b/gns3/tool.py
+@@ -25,6 +25,7 @@ import logging
+ import re
+ import shutil
+ import subprocess
++import tempfile
+ from enum import Enum
+ 
+ from .version import __version__
+@@ -32,6 +33,7 @@ from .items.node_item import NodeItem
+ from .items.link_item import LinkItem
+ from .items.text_item import TextItem
+ from .items.drawing_item import DrawingItem
++from .controller import Controller
+ 
+ log = logging.getLogger(__name__)
+ 
+@@ -101,6 +103,34 @@ class Tool:
+         """ tool name """
+         return self._name
+ 
++    def conn_param_file(self):
++        """ create file with connection setup parameter """
++
++        http_client = Controller.instance().httpClient()
++        if not http_client:
++            log.error('Could not start tool %s: %s', self._name,
++                      "Controller not set")
++            return None
++
++        fname = None
++        try:
++            fd, fname = tempfile.mkstemp(prefix="GNS3_tool_", suffix=".tmp",
++                                         text=True)
++            data = "\n".join((http_client.url(), http_client.user() or '',
++                              http_client.password() or '')) + "\n"
++            os.write(fd, data.encode("utf-8", errors='ignore'))
++            os.close(fd)
++        except OSError as err:
++            log.error("Can't create connection setup file: %s", err)
++            if fname is not None:
++                try:
++                    os.close(fd)
++                    os.remove(fname)
++                except OSError:
++                    pass
++            return None
++        return fname
++
+     def run_in_terminal(self, argv):
+         """ run command in terminal window """
+ 
+@@ -134,8 +164,11 @@ on run (args)
+ 	return
+ end run
+ """
++            user_dir = os.getcwd()
++            if user_dir == "/":
++                user_dir = os.path.expanduser("~")
+             cmd = "PATH=" + arg_quote(os.environ['PATH']) + "; " + \
+-                  "cd " + arg_quote(os.getcwd()) + "; " + cmd
++                  "cd " + arg_quote(user_dir) + "; " + cmd
+             if self.confirm_close == ConfirmCloseState.enable:
+                 cmd += "; read -p '\nClose...' var"
+             elif self.confirm_close == ConfirmCloseState.on_error:
+@@ -166,7 +199,10 @@ end run
+ 
+         if not project:
+             return
+-        args = [self._path, __version__, project.id()]
++        param_file = self.conn_param_file()
++        if not param_file:
++            return
++        args = [self._path, __version__, param_file, project.id()]
+         for item in item_list:
+             if isinstance(item, NodeItem):
+                 args.append("nodes/" + item.node().node_id())
+diff --git a/tools.md b/tools.md
+index f60652ac..c2ffcc2a 100644
+--- a/tools.md
++++ b/tools.md
+@@ -11,8 +11,14 @@ called by the GUI with the following parameters:
+ | No.  | Parameter                                  |
+ |------|--------------------------------------------|
+ |   1  |   GNS3 version (for compatibility checks)  |
+-|   2  |   Project UUID                             |
+-|   3+ |   List of selected items, can be empty     |
++|   2  |   Filename of connection setup parameters  |
++|   3  |   Project UUID                             |
++|   4+ |   List of selected items, can be empty     |
++
++The file with the connection setup parameters contains
++three lines with the URL, username and password for
++connecting to the controller. If the filename has a
++.tmp extension it may be deleted after use.
+ 
+ An item consists of it's UUID prefixed by `nodes/`
+ for node items, `text_drawings/` for text items
+-- 
+2.15.1 (Apple Git-101)
+

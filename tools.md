@@ -11,8 +11,14 @@ called by the GUI with the following parameters:
 | No.  | Parameter                                  |
 |------|--------------------------------------------|
 |   1  |   GNS3 version (for compatibility checks)  |
-|   2  |   Project UUID                             |
-|   3+ |   List of selected items, can be empty     |
+|   2  |   Filename of connection setup parameters  |
+|   3  |   Project UUID                             |
+|   4+ |   List of selected items, can be empty     |
+
+The file with the connection setup parameters contains
+three lines with the URL, username and password for
+connecting to the controller. If the filename has a
+.tmp extension it may be deleted after use.
 
 An item consists of it's UUID prefixed by `nodes/`
 for node items, `text_drawings/` for text items
