@@ -1,7 +1,7 @@
 From ec41c624782342df1607675689a42183ff0dd3c2 Mon Sep 17 00:00:00 2001
 From: Bernhard Ehlers <be@bernhard-ehlers.de>
 Date: Tue, 19 Nov 2019 14:18:55 +0100
-Subject: [PATCH 7/7] Tools - Passing controller parameters via parameter file
+Subject: [PATCH 7/8] Tools - Passing controller parameters via parameter file
 
 ---
  gns3/tool.py | 40 ++++++++++++++++++++++++++++++++++++++--

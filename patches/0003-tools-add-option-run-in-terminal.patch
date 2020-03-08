@@ -1,7 +1,7 @@
 From e5e28f31c0b72986dd83eb165de2be45a41e6711 Mon Sep 17 00:00:00 2001
 From: Bernhard Ehlers <be@bernhard-ehlers.de>
 Date: Fri, 29 Dec 2017 14:26:31 +0100
-Subject: [PATCH 3/7] tools: add option "run in terminal"
+Subject: [PATCH 3/8] tools: add option "run in terminal"
 
 ---
  gns3/tool.py | 79 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-

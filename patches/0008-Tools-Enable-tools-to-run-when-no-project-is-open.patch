@@ -1,0 +1,145 @@
+From 7849e44ba8322cb579fa3e1a12eec890c521be36 Mon Sep 17 00:00:00 2001
+From: Bernhard Ehlers <none@bernhard-ehlers.de>
+Date: Sun, 8 Mar 2020 10:16:53 +0100
+Subject: [PATCH 8/8] Tools - Enable tools to run when no project is open
+
+---
+ gns3/main_window.py |  5 ++++-
+ gns3/tool.py        | 41 ++++++++++++++++++++++++++---------------
+ tools.md            |  6 ++++--
+ 3 files changed, 34 insertions(+), 18 deletions(-)
+
+diff --git a/gns3/main_window.py b/gns3/main_window.py
+index 46cecf59..1620dce6 100644
+--- a/gns3/main_window.py
++++ b/gns3/main_window.py
+@@ -170,6 +170,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+ 
+         # add tools to tools menu
+         tool_list = self.tools.menuTools()
++        self.disableWhenNoProjectTools = []
+         if tool_list:
+             self.uiToolsMenu.addSeparator()
+             for tool in tool_list:
+@@ -177,6 +178,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+                 action.setData(tool)
+                 action.triggered.connect(self.startToolSlot)
+                 self.uiToolsMenu.addAction(action)
++                if not tool.menu_always:
++                    self.disableWhenNoProjectTools.append(action)
+ 
+         # set the window icon
+         self.setWindowIcon(QtGui.QIcon(":/images/gns3.ico"))
+@@ -204,7 +207,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+             self.uiDeleteProjectAction,
+             self.uiImportExportConfigsAction,
+             self.uiLockAllAction
+-        ]
++        ] + self.disableWhenNoProjectTools
+ 
+         # This widgets are not enabled if it's a remote controller (no access to the local file system)
+         self.disableWhenRemoteContollerWidgets = [
+diff --git a/gns3/tool.py b/gns3/tool.py
+index 55dcd562..ea52e378 100644
+--- a/gns3/tool.py
++++ b/gns3/tool.py
+@@ -56,6 +56,13 @@ else:
+         return arg
+ 
+ 
++class MenuState(Enum):
++    """ enum for menu option """
++    disable = 0
++    enable = 1
++    always = 2
++
++
+ class ContextState(Enum):
+     """ enum for context option """
+     disable = 0
+@@ -78,13 +85,15 @@ class Tool:
+     def __init__(self, name, path, options):
+         self._name = name
+         self._path = path
+-        self.confirm_close = self._enum_opt(options, 'confirm_close',
+-                                            ConfirmCloseState,
+-                                            ConfirmCloseState.enable)
++        menu = self._enum_opt(options, 'menu', MenuState, MenuState.enable)
++        self.menu = menu != MenuState.disable
++        self.menu_always = menu == MenuState.always
+         self.context = self._enum_opt(options, 'context',
+                                       ContextState, ContextState.enable)
+-        self.menu = bool(options.get('menu', True))
+         self.terminal = bool(options.get('terminal', False))
++        self.confirm_close = self._enum_opt(options, 'confirm_close',
++                                            ConfirmCloseState,
++                                            ConfirmCloseState.enable)
+ 
+     def _enum_opt(self, options, opt_name, enum_class, default):
+         """ get enum option """
+@@ -197,21 +206,23 @@ end run
+     def run(self, project, item_list):
+         """ run tool """
+ 
+-        if not project:
++        if not project and not self.menu_always:
+             return
+         param_file = self.conn_param_file()
+         if not param_file:
+             return
+-        args = [self._path, __version__, param_file, project.id()]
+-        for item in item_list:
+-            if isinstance(item, NodeItem):
+-                args.append("nodes/" + item.node().node_id())
+-            elif isinstance(item, LinkItem):
+-                args.append("links/" + item.link().link_id())
+-            elif isinstance(item, TextItem):
+-                args.append("text_drawings/" + item.drawing_id())
+-            elif isinstance(item, DrawingItem):
+-                args.append("drawings/" + item.drawing_id())
++        args = [self._path, __version__, param_file]
++        if project:
++            args.append(project.id())
++            for item in item_list:
++                if isinstance(item, NodeItem):
++                    args.append("nodes/" + item.node().node_id())
++                elif isinstance(item, LinkItem):
++                    args.append("links/" + item.link().link_id())
++                elif isinstance(item, TextItem):
++                    args.append("text_drawings/" + item.drawing_id())
++                elif isinstance(item, DrawingItem):
++                    args.append("drawings/" + item.drawing_id())
+ 
+         try:
+             if self.terminal:
+diff --git a/tools.md b/tools.md
+index c2ffcc2a..09cf83fb 100644
+--- a/tools.md
++++ b/tools.md
+@@ -12,7 +12,7 @@ called by the GUI with the following parameters:
+ |------|--------------------------------------------|
+ |   1  |   GNS3 version (for compatibility checks)  |
+ |   2  |   Filename of connection setup parameters  |
+-|   3  |   Project UUID                             |
++|   3  |   Project UUID, if a project is open       |
+ |   4+ |   List of selected items, can be empty     |
+ 
+ The file with the connection setup parameters contains
+@@ -33,11 +33,13 @@ It can set the following options:
+ | Option        | Meaning                  | Allowed Values                    | Default   |
+ |---------------|--------------------------|-----------------------------------|-----------|
+ | name          | name of tool             | any string                        | base name |
+-| menu          | show in main menu        | false / true                      | true      |
++| menu          | show in main menu        | "disable" / "enable" / "always"   | "enable"  |
+ | context       | show in context menu     | "disable" / "enable" / "node"     | "enable"  |
+ | terminal      | run in terminal window   | false / true                      | false     |
+ | confirm_close | confirm closing terminal | "disable" / "enable" / "on_error" | "enable"  |
+ 
++The menu option "enable" activates a tool only if a
++project is open, "always" will enable it in any case.
+ With the context option "node" a tool is only shown in
+ the context menu, when at least one node is selected.
+ Instead of "disable" or "enable" the boolean values
+-- 
+2.15.1 (Apple Git-101)
+

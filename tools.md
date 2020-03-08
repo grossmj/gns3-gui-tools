@@ -12,7 +12,7 @@ called by the GUI with the following parameters:
 |------|--------------------------------------------|
 |   1  |   GNS3 version (for compatibility checks)  |
 |   2  |   Filename of connection setup parameters  |
-|   3  |   Project UUID                             |
+|   3  |   Project UUID, if a project is open       |
 |   4+ |   List of selected items, can be empty     |
 
 The file with the connection setup parameters contains
@@ -33,11 +33,13 @@ It can set the following options:
 | Option        | Meaning                  | Allowed Values                    | Default   |
 |---------------|--------------------------|-----------------------------------|-----------|
 | name          | name of tool             | any string                        | base name |
-| menu          | show in main menu        | false / true                      | true      |
+| menu          | show in main menu        | "disable" / "enable" / "always"   | "enable"  |
 | context       | show in context menu     | "disable" / "enable" / "node"     | "enable"  |
 | terminal      | run in terminal window   | false / true                      | false     |
 | confirm_close | confirm closing terminal | "disable" / "enable" / "on_error" | "enable"  |
 
+The menu option "enable" activates a tool only if a
+project is open, "always" will enable it in any case.
 With the context option "node" a tool is only shown in
 the context menu, when at least one node is selected.
 Instead of "disable" or "enable" the boolean values
