@@ -1,5 +1,5 @@
 From 7849e44ba8322cb579fa3e1a12eec890c521be36 Mon Sep 17 00:00:00 2001
-From: Bernhard Ehlers <none@bernhard-ehlers.de>
+From: Bernhard Ehlers <none@b-ehlers.de>
 Date: Sun, 8 Mar 2020 10:16:53 +0100
 Subject: [PATCH 8/8] Tools - Enable tools to run when no project is open
 
