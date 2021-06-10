@@ -1,44 +1,28 @@
-From 7849e44ba8322cb579fa3e1a12eec890c521be36 Mon Sep 17 00:00:00 2001
+From f48c9a31b5efb22968c383d703b9c91f4a883a9a Mon Sep 17 00:00:00 2001
 From: Bernhard Ehlers <none@b-ehlers.de>
 Date: Sun, 8 Mar 2020 10:16:53 +0100
 Subject: [PATCH 8/8] Tools - Enable tools to run when no project is open
 
 ---
- gns3/main_window.py |  5 ++++-
+ gns3/main_window.py |  3 +++
  gns3/tool.py        | 41 ++++++++++++++++++++++++++---------------
  tools.md            |  6 ++++--
- 3 files changed, 34 insertions(+), 18 deletions(-)
+ 3 files changed, 33 insertions(+), 17 deletions(-)
 
 diff --git a/gns3/main_window.py b/gns3/main_window.py
-index 46cecf59..1620dce6 100644
+index e5837bf2..0c7c3205 100644
 --- a/gns3/main_window.py
 +++ b/gns3/main_window.py
-@@ -170,6 +170,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
- 
-         # add tools to tools menu
-         tool_list = self.tools.menuTools()
-+        self.disableWhenNoProjectTools = []
-         if tool_list:
-             self.uiToolsMenu.addSeparator()
-             for tool in tool_list:
-@@ -177,6 +178,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+@@ -195,6 +195,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                  action.setData(tool)
                  action.triggered.connect(self.startToolSlot)
                  self.uiToolsMenu.addAction(action)
 +                if not tool.menu_always:
-+                    self.disableWhenNoProjectTools.append(action)
++                    self.disableWhenNoProjectWidgets.append(action)
++            self._refreshVisibleWidgets()
  
          # set the window icon
          self.setWindowIcon(QtGui.QIcon(":/images/gns3.ico"))
-@@ -204,7 +207,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
-             self.uiDeleteProjectAction,
-             self.uiImportExportConfigsAction,
-             self.uiLockAllAction
--        ]
-+        ] + self.disableWhenNoProjectTools
- 
-         # This widgets are not enabled if it's a remote controller (no access to the local file system)
-         self.disableWhenRemoteContollerWidgets = [
 diff --git a/gns3/tool.py b/gns3/tool.py
 index 55dcd562..ea52e378 100644
 --- a/gns3/tool.py
@@ -141,5 +125,5 @@ index c2ffcc2a..09cf83fb 100644
  the context menu, when at least one node is selected.
  Instead of "disable" or "enable" the boolean values
 -- 
-2.15.1 (Apple Git-101)
+2.30.2
 
