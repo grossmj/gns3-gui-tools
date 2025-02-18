@@ -29,8 +29,8 @@ index d965a177..9d589949 100644
 +                tool_action.triggered.connect(self.startToolSlot)
 +                tool_menu_action.addAction(tool_action)
 +
-         if sys.platform.startswith("win") and True in list(map(lambda item: isinstance(item, NodeItem) and hasattr(item.node(), "bringToFront"), items)):
-             # Action: bring console or window to front (Windows only)
+         if not sys.platform.startswith("darwin") and True in list(map(lambda item: isinstance(item, NodeItem) and hasattr(item.node(), "bringToFront"), items)):
+             # Action: bring console or window to front (Windows and Linux only)
              bring_to_front_action = QtWidgets.QAction("Bring to front", menu)
 @@ -1625,3 +1636,12 @@ class GraphicsView(QtWidgets.QGraphicsView):
              self._main_window.uiDeviceMenu.setEnabled(True)
